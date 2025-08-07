@@ -1139,7 +1139,6 @@
               var timeStr = formatTime(startTime);
               restoreOverlay.innerHTML = '上次播放至 ' + timeStr + '<br>点击屏幕继续播放';
               restoreOverlay.style.display = 'flex';
-              
               // 设置点击事件处理
               restoreOverlay.onclick = function() {
                 restoreOverlay.style.display = 'none';
@@ -1162,9 +1161,13 @@
                       console.log('iOS恢复播放：跳转到 ' + pendingSeekTime + '秒');
                       player.currentTime(pendingSeekTime);
                       pendingSeekTime = null;
+                      // 确保覆盖层被隐藏
+                      restoreOverlay.style.display = 'none';
                     }, 200); // iOS 9 需要更长的延迟
                   }).catch(function(e) {
                     console.error('播放失败:', e);
+                    // 播放失败时也要隐藏覆盖层
+                    restoreOverlay.style.display = 'none';
                   });
                 } else {
                   // 旧版本浏览器不返回Promise
@@ -1172,9 +1175,12 @@
                     console.log('iOS恢复播放：跳转到 ' + pendingSeekTime + '秒');
                     player.currentTime(pendingSeekTime);
                     pendingSeekTime = null;
+                    // 确保覆盖层被隐藏
+                    restoreOverlay.style.display = 'none';
                   }, 300); // iOS 9 需要更长的延迟
                 }
               };
+
             } else {
               // 非iOS设备直接跳转
               player.currentTime(startTime);
@@ -1904,6 +1910,12 @@
           } else if (!isIOS && Math.floor(currentTime) % 10 === 0) {
             saveProgress();
           }
+        });
+
+        // 播放开始时隐藏覆盖层
+        player.on('play', function() {
+          var restoreOverlay = document.getElementById('restore-overlay');
+          restoreOverlay.style.display = 'none';
         });
         
         // 页面状态变化时保存进度
