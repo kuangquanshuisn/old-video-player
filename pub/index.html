@@ -995,17 +995,16 @@
           li.addEventListener('click', function() {
             console.log('点击系列:', series.title, '索引:', index);
             displayEpisodes(index);
-            // 延迟播放以确保UI更新完成
-            setTimeout(function() {
-              var lastPlayed = findLastPlayedEpisodeForSeries(index);
-              if (lastPlayed) {
-                console.log('恢复播放:', lastPlayed);
-                playEpisode(index, lastPlayed.episodeIndex, lastPlayed.time);
-              } else {
-                console.log('播放第一集');
-                playEpisode(index, 0);
-              }
-            }, 100);
+            
+            // 查找最后播放的剧集
+            var lastPlayed = findLastPlayedEpisodeForSeries(index);
+            if (lastPlayed) {
+              console.log('找到播放记录，剧集:', lastPlayed.episodeIndex, '时间:', lastPlayed.time);
+              playEpisode(index, lastPlayed.episodeIndex, lastPlayed.time);
+            } else {
+              console.log('没有播放记录，播放第一集');
+              playEpisode(index, 0);
+            }
           });
           seriesListEl.appendChild(li);
         });
@@ -1071,6 +1070,7 @@
         }
         
         var restoreOverlay = document.getElementById('restore-overlay');
+        var pendingSeekTime = null;
         restoreOverlay.style.display = 'none';
         currentSeriesIndex = seriesIdx;
         currentEpisodeIndex = episodeIdx;
@@ -1081,108 +1081,60 @@
         
         console.log('准备播放:', episode.name, episode.url);
         
-        // iOS 9 HLS播放优化
-        if (player) {
-          // 检测视频类型
-          var videoType = 'application/x-mpegURL';
-          if (episode.url.indexOf('.mp4') > -1) {
-            videoType = 'video/mp4';
-          }
-          
-          // 先暂停当前播放
-          player.pause();
-          
-          // 设置视频源
-          player.src({
-            src: episode.url,
-            type: videoType
-          });
-          
-          // 加载视频
-          player.load();
-          
-          // 使用ready而不是loadedmetadata，更可靠
-          player.ready(function() {
-            console.log('播放器ready，视频URL:', episode.url);
-            
-            // 监听loadeddata事件，确保视频数据已加载
-            player.one('loadeddata', function() {
-              console.log('视频数据已加载，准备处理跳转');
+        // 检测视频类型
+        var videoType = 'application/x-mpegURL';
+        if (episode.url.indexOf('.mp4') > -1) {
+          videoType = 'video/mp4';
+        }
+        
+        // 设置视频源
+        player.src({
+          src: episode.url,
+          type: videoType
+        });
+        
+        // iOS检测
+        var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+        
+        if (startTime !== null && startTime !== undefined && startTime > 0) {
+          pendingSeekTime = startTime;
+          // 如果有指定开始时间，等待元数据加载后处理
+          player.one('loadedmetadata', function() {
+            if (isIOS) {
+              // iOS需要用户交互才能跳转，显示恢复提示
+              var timeStr = formatTime(startTime);
+              restoreOverlay.innerHTML = '上次播放至 ' + timeStr + '<br>点击屏幕继续播放';
+              restoreOverlay.style.display = 'flex';
               
-              if (startTime && startTime > 0) {
-                // iOS需要用户交互才能跳转
-                var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-                if (isIOS) {
-                  var timeStr = formatTime(startTime);
-                  restoreOverlay.innerHTML = '上次播放至 ' + timeStr + '<br>点击屏幕继续播放';
-                  restoreOverlay.style.display = 'flex';
-                  
-                  restoreOverlay.onclick = function() {
-                    console.log('用户点击，开始恢复播放');
-                    restoreOverlay.style.display = 'none';
-                    
-                    // iOS 9 兼容性处理
-                    var playPromise = player.play();
-                    
-                    if (playPromise && typeof playPromise.then === 'function') {
-                      // 支持Promise的浏览器
-                      playPromise.then(function() {
-                        console.log('视频开始播放，准备跳转');
-                        // 使用canplay事件确保可以安全跳转
-                        player.one('playing', function() {
-                          console.log('视频正在播放，跳转到:', startTime);
-                          player.currentTime(startTime);
-                        });
-                      }).catch(function(e) {
-                        console.error('播放失败:', e);
-                        alert('播放失败，请重试');
-                      });
-                    } else {
-                      // 不支持Promise的旧浏览器（iOS 9）
-                      console.log('使用传统方式播放');
-                      try {
-                        player.play();
-                        // 等待一段时间后跳转
-                        setTimeout(function() {
-                          console.log('延迟跳转到:', startTime);
-                          player.currentTime(startTime);
-                        }, 1000);
-                      } catch (e) {
-                        console.error('播放出错:', e);
-                        alert('播放失败，请重试');
-                      }
-                    }
-                  };
-                } else {
-                  player.currentTime(startTime);
-                  player.play().catch(function(e) {
-                    console.error('播放失败:', e);
-                    // 显示点击播放提示
-                    restoreOverlay.innerHTML = '点击屏幕开始播放';
-                    restoreOverlay.style.display = 'flex';
-                    restoreOverlay.onclick = function() {
-                      player.play();
-                      restoreOverlay.style.display = 'none';
-                    };
-                  });
-                }
-              } else {
-                // 尝试自动播放
-                player.play().catch(function(e) {
-                  console.error('自动播放失败:', e);
-                  // 如果自动播放失败，显示提示
-                  restoreOverlay.innerHTML = '点击屏幕开始播放';
-                  restoreOverlay.style.display = 'flex';
-                  restoreOverlay.onclick = function() {
-                    player.play().catch(function(playError) {
-                      console.error('手动播放也失败:', playError);
-                      alert('视频播放失败，可能是网络问题或视频源不可用');
-                    });
-                    restoreOverlay.style.display = 'none';
-                  };
-                });
-              }
-            }, 500);
+              // 设置点击事件处理
+              restoreOverlay.onclick = function() {
+                restoreOverlay.style.display = 'none';
+                // 先播放，然后在合适的时机跳转
+                player.play();
+                // 使用setTimeout确保播放已开始
+                setTimeout(function() {
+                  console.log('iOS恢复播放：跳转到 ' + pendingSeekTime + '秒');
+                  player.currentTime(pendingSeekTime);
+                  pendingSeekTime = null;
+                }, 100);
+              };
+            } else {
+              // 非iOS设备直接跳转
+              player.currentTime(startTime);
+              player.play();
+            }
+          });
+        } else {
+          // 没有指定时间，直接播放
+          player.play().catch(function(e) {
+            console.error('自动播放失败:', e);
+            // 如果自动播放失败，显示提示
+            restoreOverlay.innerHTML = '点击屏幕开始播放';
+            restoreOverlay.style.display = 'flex';
+            restoreOverlay.onclick = function() {
+              restoreOverlay.style.display = 'none';
+              player.play();
+            };
           });
         }
         
@@ -1218,6 +1170,7 @@
             if (e.target.className !== 'episode-delete') {
               console.log('点击剧集:', episode.name, '索引:', index);
               var historyTime = findHistoryForEpisode(seriesIdx, index);
+              console.log('找到的历史播放时间:', historyTime);
               // 确保播放器已初始化
               if (player) {
                 playEpisode(seriesIdx, index, historyTime);
@@ -1421,21 +1374,19 @@
             console.log('点击历史记录:', item.seriesTitle, item.episodeName, '时间:', item.currentTime);
             switchTab('series');
             
-            // 增加延迟确保UI更新完成
+            // 先显示剧集列表
+            displayEpisodes(item.seriesIndex);
+            
+            // 延迟播放以确保UI更新完成
             setTimeout(function() {
-              displayEpisodes(item.seriesIndex);
-              
-              // 再次延迟确保剧集列表渲染完成
-              setTimeout(function() {
-                // 确保播放器已初始化
-                if (player) {
-                  playEpisode(item.seriesIndex, item.episodeIndex, item.currentTime);
-                } else {
-                  console.error('播放器未初始化');
-                  alert('播放器未就绪，请稍后重试');
-                }
-              }, 300); // 增加延迟时间
-            }, 200); // 增加延迟时间
+              // 确保播放器已初始化
+              if (player) {
+                playEpisode(item.seriesIndex, item.episodeIndex, item.currentTime);
+              } else {
+                console.error('播放器未初始化');
+                alert('播放器未就绪，请稍后重试');
+              }
+            }, 100);
           });
           
           historyListEl.appendChild(historyItem);
