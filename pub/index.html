@@ -1020,13 +1020,23 @@
         
         // iOS 9 HLS播放优化
         if (player) {
+          // 检测视频类型
+          var videoType = 'application/x-mpegURL';
+          if (episode.url.indexOf('.mp4') > -1) {
+            videoType = 'video/mp4';
+          }
+          
+          // 设置视频源
           player.src({
             src: episode.url,
-            type: 'application/x-mpegURL'
+            type: videoType
           });
           
-          if (startTime && startTime > 0) {
-            player.ready(function() {
+          // 等待播放器准备就绪
+          player.ready(function() {
+            console.log('播放器准备就绪，准备播放:', episode.url);
+            
+            if (startTime && startTime > 0) {
               // iOS需要用户交互才能跳转
               var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
               if (isIOS) {
@@ -1036,17 +1046,40 @@
                 
                 restoreOverlay.onclick = function() {
                   player.currentTime(startTime);
-                  player.play();
+                  player.play().catch(function(e) {
+                    console.error('播放失败:', e);
+                  });
                   restoreOverlay.style.display = 'none';
                 };
               } else {
                 player.currentTime(startTime);
-                player.play();
+                player.play().catch(function(e) {
+                  console.error('播放失败:', e);
+                });
               }
-            });
-          } else {
-            player.play();
-          }
+            } else {
+              // 尝试自动播放
+              player.play().catch(function(e) {
+                console.error('自动播放失败:', e);
+                // 如果自动播放失败，显示提示
+                restoreOverlay.innerHTML = '点击屏幕开始播放';
+                restoreOverlay.style.display = 'flex';
+                restoreOverlay.onclick = function() {
+                  player.play();
+                  restoreOverlay.style.display = 'none';
+                };
+              });
+            }
+          });
+          
+          // 错误处理
+          player.on('error', function() {
+            var error = player.error();
+            console.error('播放器错误:', error);
+            if (error) {
+              alert('视频播放出错: ' + (error.message || '未知错误'));
+            }
+          });
         }
         
         updateActiveStates();
