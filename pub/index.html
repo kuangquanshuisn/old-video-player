@@ -1093,8 +1093,41 @@
           type: videoType
         });
         
-        // iOS检测
-        var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+        // 增强的iOS检测 - 支持iOS 9 Firefox等各种浏览器
+        var isIOS = (function() {
+          var ua = navigator.userAgent.toLowerCase();
+          var platform = navigator.platform.toLowerCase();
+          
+          // 检查User Agent中的iOS设备标识
+          var hasIOSDevice = /ipad|iphone|ipod/.test(ua);
+          
+          // 检查平台信息
+          var hasIOSPlatform = /iphone|ipad|ipod/.test(platform);
+          
+          // 检查是否为iOS系统（包括各种浏览器）
+          var hasIOSSystem = /os \d+_/.test(ua) || /version\/[\d\.]+.*mobile.*safari/.test(ua);
+          
+          // 检查触摸事件支持（iOS特有）
+          var hasTouchSupport = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+          
+          // 检查是否为移动设备且支持webkit
+          var isMobileWebkit = /mobile/.test(ua) && /webkit/.test(ua);
+          
+          // 排除Windows Phone
+          var isNotWindowsPhone = !window.MSStream && !/windows phone/.test(ua);
+          
+          // 综合判断：满足任一iOS特征且不是Windows Phone
+          return isNotWindowsPhone && (
+            hasIOSDevice ||
+            hasIOSPlatform ||
+            hasIOSSystem ||
+            (hasTouchSupport && isMobileWebkit && (/safari|firefox|chrome|crios|fxios/.test(ua)))
+          );
+        })();
+        
+        console.log('iOS检测结果:', isIOS);
+        console.log('User Agent:', navigator.userAgent);
+        console.log('Platform:', navigator.platform);
         
         if (startTime !== null && startTime !== undefined && startTime > 0) {
           pendingSeekTime = startTime;
@@ -1627,8 +1660,37 @@
           renderSeriesList();
         }
         
-        // iOS检测
-        var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+        // 使用相同的增强iOS检测逻辑
+        var isIOS = (function() {
+          var ua = navigator.userAgent.toLowerCase();
+          var platform = navigator.platform.toLowerCase();
+          
+          // 检查User Agent中的iOS设备标识
+          var hasIOSDevice = /ipad|iphone|ipod/.test(ua);
+          
+          // 检查平台信息
+          var hasIOSPlatform = /iphone|ipad|ipod/.test(platform);
+          
+          // 检查是否为iOS系统（包括各种浏览器）
+          var hasIOSSystem = /os \d+_/.test(ua) || /version\/[\d\.]+.*mobile.*safari/.test(ua);
+          
+          // 检查触摸事件支持（iOS特有）
+          var hasTouchSupport = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+          
+          // 检查是否为移动设备且支持webkit
+          var isMobileWebkit = /mobile/.test(ua) && /webkit/.test(ua);
+          
+          // 排除Windows Phone
+          var isNotWindowsPhone = !window.MSStream && !/windows phone/.test(ua);
+          
+          // 综合判断：满足任一iOS特征且不是Windows Phone
+          return isNotWindowsPhone && (
+            hasIOSDevice ||
+            hasIOSPlatform ||
+            hasIOSSystem ||
+            (hasTouchSupport && isMobileWebkit && (/safari|firefox|chrome|crios|fxios/.test(ua)))
+          );
+        })();
         
         // 初始化Video.js播放器 - iOS 9优化配置
         var playerOptions = {
