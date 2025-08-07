@@ -945,13 +945,19 @@
           
           li.innerHTML = html;
           li.addEventListener('click', function() {
+            console.log('点击系列:', series.title, '索引:', index);
             displayEpisodes(index);
-            var lastPlayed = findLastPlayedEpisodeForSeries(index);
-            if (lastPlayed) {
-              playEpisode(index, lastPlayed.episodeIndex, lastPlayed.time);
-            } else {
-              playEpisode(index, 0);
-            }
+            // 延迟播放以确保UI更新完成
+            setTimeout(function() {
+              var lastPlayed = findLastPlayedEpisodeForSeries(index);
+              if (lastPlayed) {
+                console.log('恢复播放:', lastPlayed);
+                playEpisode(index, lastPlayed.episodeIndex, lastPlayed.time);
+              } else {
+                console.log('播放第一集');
+                playEpisode(index, 0);
+              }
+            }, 100);
           });
           seriesListEl.appendChild(li);
         });
@@ -1004,8 +1010,15 @@
 
       // 播放剧集
       function playEpisode(seriesIdx, episodeIdx, startTime) {
+        console.log('playEpisode调用:', seriesIdx, episodeIdx, startTime);
+        
         if (!seriesData[seriesIdx] || !seriesData[seriesIdx].episodes[episodeIdx]) {
-          console.error('视频不存在');
+          console.error('视频不存在', seriesIdx, episodeIdx);
+          return;
+        }
+        
+        if (!player) {
+          console.error('播放器未初始化');
           return;
         }
         
@@ -1018,6 +1031,8 @@
         var seriesTitle = seriesData[seriesIdx].title;
         document.getElementById('combined-title').textContent = seriesTitle + ' - ' + episode.name;
         
+        console.log('准备播放:', episode.name, episode.url);
+        
         // iOS 9 HLS播放优化
         if (player) {
           // 检测视频类型
@@ -1026,59 +1041,70 @@
             videoType = 'video/mp4';
           }
           
+          // 先暂停当前播放
+          player.pause();
+          
           // 设置视频源
           player.src({
             src: episode.url,
             type: videoType
           });
           
-          // 等待播放器准备就绪
+          // 加载视频
+          player.load();
+          
+          // 使用ready而不是loadedmetadata，更可靠
           player.ready(function() {
-            console.log('播放器准备就绪，准备播放:', episode.url);
+            console.log('播放器ready，视频URL:', episode.url);
             
-            if (startTime && startTime > 0) {
-              // iOS需要用户交互才能跳转
-              var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-              if (isIOS) {
-                var timeStr = formatTime(startTime);
-                restoreOverlay.innerHTML = '上次播放至 ' + timeStr + '<br>点击屏幕继续播放';
-                restoreOverlay.style.display = 'flex';
-                
-                restoreOverlay.onclick = function() {
+            // 等待一小段时间确保视频加载
+            setTimeout(function() {
+              if (startTime && startTime > 0) {
+                // iOS需要用户交互才能跳转
+                var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+                if (isIOS) {
+                  var timeStr = formatTime(startTime);
+                  restoreOverlay.innerHTML = '上次播放至 ' + timeStr + '<br>点击屏幕继续播放';
+                  restoreOverlay.style.display = 'flex';
+                  
+                  restoreOverlay.onclick = function() {
+                    player.currentTime(startTime);
+                    player.play().catch(function(e) {
+                      console.error('播放失败:', e);
+                      alert('播放失败，请重试');
+                    });
+                    restoreOverlay.style.display = 'none';
+                  };
+                } else {
                   player.currentTime(startTime);
                   player.play().catch(function(e) {
                     console.error('播放失败:', e);
+                    // 显示点击播放提示
+                    restoreOverlay.innerHTML = '点击屏幕开始播放';
+                    restoreOverlay.style.display = 'flex';
+                    restoreOverlay.onclick = function() {
+                      player.play();
+                      restoreOverlay.style.display = 'none';
+                    };
                   });
-                  restoreOverlay.style.display = 'none';
-                };
+                }
               } else {
-                player.currentTime(startTime);
+                // 尝试自动播放
                 player.play().catch(function(e) {
-                  console.error('播放失败:', e);
+                  console.error('自动播放失败:', e);
+                  // 如果自动播放失败，显示提示
+                  restoreOverlay.innerHTML = '点击屏幕开始播放';
+                  restoreOverlay.style.display = 'flex';
+                  restoreOverlay.onclick = function() {
+                    player.play().catch(function(playError) {
+                      console.error('手动播放也失败:', playError);
+                      alert('视频播放失败，可能是网络问题或视频源不可用');
+                    });
+                    restoreOverlay.style.display = 'none';
+                  };
                 });
               }
-            } else {
-              // 尝试自动播放
-              player.play().catch(function(e) {
-                console.error('自动播放失败:', e);
-                // 如果自动播放失败，显示提示
-                restoreOverlay.innerHTML = '点击屏幕开始播放';
-                restoreOverlay.style.display = 'flex';
-                restoreOverlay.onclick = function() {
-                  player.play();
-                  restoreOverlay.style.display = 'none';
-                };
-              });
-            }
-          });
-          
-          // 错误处理
-          player.on('error', function() {
-            var error = player.error();
-            console.error('播放器错误:', error);
-            if (error) {
-              alert('视频播放出错: ' + (error.message || '未知错误'));
-            }
+            }, 500);
           });
         }
         
@@ -1112,8 +1138,15 @@
           btn.innerHTML = html;
           btn.addEventListener('click', function(e) {
             if (e.target.className !== 'episode-delete') {
+              console.log('点击剧集:', episode.name, '索引:', index);
               var historyTime = findHistoryForEpisode(seriesIdx, index);
-              playEpisode(seriesIdx, index, historyTime);
+              // 确保播放器已初始化
+              if (player) {
+                playEpisode(seriesIdx, index, historyTime);
+              } else {
+                console.error('播放器未初始化，无法播放');
+                alert('播放器未初始化，请刷新页面重试');
+              }
             }
           });
           episodeListEl.appendChild(btn);
@@ -1309,8 +1342,10 @@
           historyItem.addEventListener('click', function() {
             switchTab('series');
             setTimeout(function() {
-              playEpisode(item.seriesIndex, item.episodeIndex, item.currentTime);
               displayEpisodes(item.seriesIndex);
+              setTimeout(function() {
+                playEpisode(item.seriesIndex, item.episodeIndex, item.currentTime);
+              }, 200);
             }, 100);
           });
           
@@ -1487,11 +1522,14 @@
         }
         
         // 初始化Video.js播放器 - iOS 9优化配置
-        player = videojs('my-video', {
+        var playerOptions = {
           html5: {
             hls: {
-              overrideNative: false, // iOS使用原生HLS
-              withCredentials: false
+              overrideNative: !videojs.browser.IS_IOS, // iOS使用原生HLS
+              withCredentials: false,
+              enableLowInitialPlaylist: true,
+              smoothQualityChange: true,
+              fastQualityChange: true
             },
             nativeVideoTracks: false,
             nativeAudioTracks: false,
@@ -1501,8 +1539,42 @@
           controls: true,
           preload: 'auto',
           fluid: true,
-          responsive: true
-        });
+          responsive: true,
+          errorDisplay: true,
+          sources: []
+        };
+        
+        try {
+          player = videojs('my-video', playerOptions);
+          console.log('Video.js播放器初始化成功');
+          
+          // 添加错误处理
+          player.on('error', function() {
+            var error = player.error();
+            console.error('播放器错误:', error);
+            if (error && error.code === 4) {
+              // 媒体错误，可能是CORS或格式问题
+              alert('视频加载失败，可能是网络问题或视频源不可用。\n错误信息：' + (error.message || '未知错误'));
+            }
+          });
+          
+          // 监听加载事件
+          player.on('loadstart', function() {
+            console.log('开始加载视频...');
+          });
+          
+          player.on('loadeddata', function() {
+            console.log('视频数据加载完成');
+          });
+          
+          player.on('canplay', function() {
+            console.log('视频可以播放');
+          });
+          
+        } catch (e) {
+          console.error('播放器初始化失败:', e);
+          alert('播放器初始化失败，请刷新页面重试');
+        }
 
         // 设置表单处理
         var addVideoForm = document.getElementById('add-video-form');
@@ -1612,12 +1684,9 @@
             showEmptyState();
             return;
           } else {
-            console.log('找到', seriesData.length, '个视频系列，开始显示');
-            // 如果有数据，确保显示第一个视频
-            if (seriesData.length > 0) {
-              displayEpisodes(0);
-              playEpisode(0, 0);
-            }
+            console.log('找到', seriesData.length, '个视频系列');
+            // 不自动播放第一个视频，等待用户选择
+            updateActiveStates();
           }
         }, 200);
 
@@ -1642,10 +1711,13 @@
           currentSeriesIndex = savedProgress.seriesIndex;
           currentEpisodeIndex = savedProgress.episodeIndex;
           displayEpisodes(currentSeriesIndex);
-          playEpisode(currentSeriesIndex, currentEpisodeIndex, savedProgress.time);
-        } else {
+          setTimeout(function() {
+            playEpisode(currentSeriesIndex, currentEpisodeIndex, savedProgress.time);
+          }, 300);
+        } else if (seriesData.length > 0) {
+          // 只显示第一个系列的剧集列表，不自动播放
           displayEpisodes(0);
-          playEpisode(0, 0);
+          updateActiveStates();
         }
 
         // 定期保存进度
