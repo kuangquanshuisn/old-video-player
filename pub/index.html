@@ -771,12 +771,20 @@
     </div>
   </div>
 
-  <script src="data.js"></script>
   <!-- Video.js 5.20.5 - iOS 9 兼容版本 -->
   <script src="https://vjs.zencdn.net/5.20.5/video.js"></script>
   <!-- HLS 支持 -->
   <script src="https://cdn.jsdelivr.net/npm/videojs-contrib-hls@5.15.0/dist/videojs-contrib-hls.min.js"></script>
+  <!-- 加载视频数据 -->
+  <script src="data.js"></script>
   <script>
+    // 检查 playerData 是否加载成功
+    if (typeof playerData === 'undefined') {
+      console.error('错误：data.js 文件未正确加载或 playerData 未定义');
+    } else {
+      console.log('data.js 加载成功，包含', playerData.length, '个视频系列');
+    }
+    
     // iOS 9 兼容的JavaScript代码
     (function() {
       'use strict';
@@ -859,10 +867,15 @@
           if (typeof playerData !== 'undefined' && Array.isArray(playerData)) {
             dataJsContent = playerData.slice();
             console.log('加载的data.js数据:', dataJsContent);
+          } else {
+            console.error('警告：playerData 未定义或不是数组');
+            console.log('typeof playerData:', typeof playerData);
+            console.log('playerData:', playerData);
           }
           
           seriesData = dataJsContent.concat(userData);
           console.log('最终合并的数据:', seriesData);
+          console.log('seriesData长度:', seriesData.length);
           
         } catch (e) {
           console.error('加载视频数据失败:', e);
@@ -893,10 +906,20 @@
 
       // 渲染系列列表
       function renderSeriesList() {
+        console.log('开始渲染系列列表...');
         var seriesListEl = document.getElementById('series-list');
+        
+        if (!seriesListEl) {
+          console.error('错误：找不到 series-list 元素');
+          return;
+        }
+        
         seriesListEl.innerHTML = '';
         
+        console.log('当前 seriesData 长度:', seriesData.length);
+        
         if (seriesData.length === 0) {
+          console.log('没有视频数据，显示空状态');
           showEmptyState();
           return;
         }
@@ -908,7 +931,10 @@
           dataJsCount = playerData.length;
         }
         
+        console.log('开始渲染视频列表，共', seriesData.length, '个系列');
+        
         seriesData.forEach(function(series, index) {
+          console.log('渲染系列', index + 1, ':', series.title);
           var li = document.createElement('li');
           var isFromDataJs = index < dataJsCount;
           
@@ -930,6 +956,7 @@
           seriesListEl.appendChild(li);
         });
         
+        console.log('系列列表渲染完成');
         updateActiveStates();
       }
 
@@ -1406,7 +1433,25 @@
 
       // 初始化播放器
       function initializePlayer() {
-        loadSeriesData();
+        console.log('初始化播放器...');
+        
+        // 确保 playerData 已加载
+        if (typeof playerData === 'undefined') {
+          console.error('警告：playerData 未定义，尝试重新加载...');
+          // 给一点时间让 data.js 加载
+          setTimeout(function() {
+            if (typeof playerData === 'undefined') {
+              console.error('错误：无法加载 playerData');
+              // 设置为空数组以避免错误
+              window.playerData = [];
+            }
+            loadSeriesData();
+            renderSeriesList();
+          }, 100);
+        } else {
+          loadSeriesData();
+          renderSeriesList();
+        }
         
         // 初始化Video.js播放器 - iOS 9优化配置
         player = videojs('my-video', {
@@ -1524,13 +1569,24 @@
           }
         });
 
-        // 初始化界面
-        renderSeriesList();
+        // 初始化界面 - 移到上面了
+        // renderSeriesList();
         
-        if (seriesData.length === 0) {
-          showEmptyState();
-          return;
-        }
+        // 延迟检查数据是否为空
+        setTimeout(function() {
+          if (seriesData.length === 0) {
+            console.log('没有视频数据，显示空状态');
+            showEmptyState();
+            return;
+          } else {
+            console.log('找到', seriesData.length, '个视频系列，开始显示');
+            // 如果有数据，确保显示第一个视频
+            if (seriesData.length > 0) {
+              displayEpisodes(0);
+              playEpisode(0, 0);
+            }
+          }
+        }, 200);
 
         // 检查保存的进度
         var savedProgressRaw = localStorage.getItem('playbackProgress');

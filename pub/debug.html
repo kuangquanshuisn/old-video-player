@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>调试视频播放器</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      background: #f0f0f0;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    h1 {
+      color: #333;
+      margin-bottom: 20px;
+    }
+    .status {
+      padding: 10px;
+      margin: 10px 0;
+      border-radius: 4px;
+    }
+    .success {
+      background: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+    }
+    .error {
+      background: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+    }
+    .info {
+      background: #d1ecf1;
+      color: #0c5460;
+      border: 1px solid #bee5eb;
+    }
+    pre {
+      background: #f8f9fa;
+      padding: 10px;
+      border-radius: 4px;
+      overflow-x: auto;
+      border: 1px solid #dee2e6;
+    }
+    button {
+      background: #007bff;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      margin: 5px;
+    }
+    button:hover {
+      background: #0056b3;
+    }
+    .video-item {
+      background: #f8f9fa;
+      padding: 10px;
+      margin: 5px 0;
+      border-radius: 4px;
+      border: 1px solid #dee2e6;
+    }
+    .video-title {
+      font-weight: bold;
+      color: #333;
+    }
+    .episode-count {
+      color: #666;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>视频播放器调试页面</h1>
+    
+    <div id="status-container"></div>
+    
+    <h2>操作按钮</h2>
+    <button onclick="checkDataJs()">检查 data.js 文件</button>
+    <button onclick="checkLocalStorage()">检查本地存储</button>
+    <button onclick="clearAuth()">清除认证信息</button>
+    <button onclick="clearAllData()">清除所有数据</button>
+    <button onclick="goToMainPage()">返回主页面</button>
+    
+    <h2>视频数据</h2>
+    <div id="video-data"></div>
+    
+    <h2>调试信息</h2>
+    <pre id="debug-info"></pre>
+  </div>
+
+  <script src="data.js"></script>
+  <script>
+    function addStatus(message, type = 'info') {
+      const container = document.getElementById('status-container');
+      const div = document.createElement('div');
+      div.className = `status ${type}`;
+      div.textContent = message;
+      container.appendChild(div);
+    }
+
+    function checkDataJs() {
+      const debugInfo = document.getElementById('debug-info');
+      const videoData = document.getElementById('video-data');
+      
+      try {
+        if (typeof playerData !== 'undefined') {
+          addStatus(`成功加载 data.js，包含 ${playerData.length} 个视频系列`, 'success');
+          
+          // 显示视频数据
+          videoData.innerHTML = '';
+          playerData.forEach((series, index) => {
+            const div = document.createElement('div');
+            div.className = 'video-item';
+            div.innerHTML = `
+              <div class="video-title">${index + 1}. ${series.title}</div>
+              <div class="episode-count">共 ${series.episodes.length} 集</div>
+            `;
+            videoData.appendChild(div);
+          });
+          
+          // 显示详细数据
+          debugInfo.textContent = JSON.stringify(playerData, null, 2);
+        } else {
+          addStatus('错误：playerData 未定义，data.js 可能未正确加载', 'error');
+          debugInfo.textContent = '无法找到 playerData 变量';
+        }
+      } catch (e) {
+        addStatus(`错误：${e.message}`, 'error');
+        debugInfo.textContent = e.stack;
+      }
+    }
+
+    function checkLocalStorage() {
+      const debugInfo = document.getElementById('debug-info');
+      
+      try {
+        const authData = localStorage.getItem('videoPlayerAuth');
+        const userVideoData = localStorage.getItem('userVideoSeriesData');
+        const playHistory = localStorage.getItem('playHistory');
+        const playbackProgress = localStorage.getItem('playbackProgress');
+        
+        const data = {
+          认证信息: authData ? JSON.parse(authData) : null,
+          用户视频数据: userVideoData ? JSON.parse(userVideoData) : null,
+          播放历史: playHistory ? JSON.parse(playHistory) : null,
+          播放进度: playbackProgress ? JSON.parse(playbackProgress) : null
+        };
+        
+        debugInfo.textContent = JSON.stringify(data, null, 2);
+        
+        if (authData) {
+          const auth = JSON.parse(authData);
+          const now = Date.now();
+          if (now > auth.expiry) {
+            addStatus('认证已过期', 'error');
+          } else {
+            const daysLeft = Math.round((auth.expiry - now) / (24 * 60 * 60 * 1000));
+            addStatus(`认证有效，剩余 ${daysLeft} 天`, 'success');
+          }
+        } else {
+          addStatus('未找到认证信息', 'info');
+        }
+        
+        if (userVideoData) {
+          const userData = JSON.parse(userVideoData);
+          addStatus(`找到 ${userData.length} 个用户添加的视频系列`, 'info');
+        }
+        
+      } catch (e) {
+        addStatus(`错误：${e.message}`, 'error');
+        debugInfo.textContent = e.stack;
+      }
+    }
+
+    function clearAuth() {
+      if (confirm('确定要清除认证信息吗？下次访问需要重新输入密码。')) {
+        localStorage.removeItem('videoPlayerAuth');
+        addStatus('认证信息已清除', 'success');
+      }
+    }
+
+    function clearAllData() {
+      if (confirm('确定要清除所有数据吗？这将删除所有用户添加的视频和播放记录。')) {
+        localStorage.removeItem('videoPlayerAuth');
+        localStorage.removeItem('userVideoSeriesData');
+        localStorage.removeItem('playHistory');
+        localStorage.removeItem('playbackProgress');
+        addStatus('所有数据已清除', 'success');
+      }
+    }
+
+    function goToMainPage() {
+      window.location.href = 'index.html';
+    }
+
+    // 页面加载时自动检查
+    window.onload = function() {
+      checkDataJs();
+      checkLocalStorage();
+    };
+  </script>
+</body>
+</html>
