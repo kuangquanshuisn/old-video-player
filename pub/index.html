@@ -58,6 +58,7 @@
     flex-direction: column;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
+    position: relative;
   }
 
   /* 侧边栏样式 */
@@ -270,6 +271,8 @@
     background: #000;
     border-radius: 12px;
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    -webkit-flex-shrink: 0; /* 防止播放器被压缩 */
+    flex-shrink: 0;
   }
 
   /* Video.js 样式覆盖 */
@@ -300,6 +303,8 @@
     font-size: 22px;
     font-weight: 600;
     color: #1f2937;
+    -webkit-flex-shrink: 0; /* 防止标题被压缩 */
+    flex-shrink: 0;
   }
 
   .episode-list {
@@ -308,12 +313,37 @@
     -webkit-flex-wrap: wrap;
     flex-wrap: wrap;
     gap: 8px;
-    padding: 20px 0;
+    padding: 20px;
     -webkit-justify-content: flex-start;
     justify-content: flex-start;
     max-width: 1000px;
     width: 100%;
     margin: 0 auto 20px;
+    max-height: 200px; /* 限制最大高度 */
+    overflow-y: auto; /* 添加垂直滚动 */
+    -webkit-overflow-scrolling: touch; /* iOS 9 平滑滚动 */
+    background: #f8f9fa;
+    border-radius: 8px;
+    border: 1px solid #e5e7eb;
+  }
+  
+  /* 剧集列表滚动条样式 */
+  .episode-list::-webkit-scrollbar {
+    width: 6px;
+  }
+  
+  .episode-list::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 3px;
+  }
+  
+  .episode-list::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 3px;
+  }
+  
+  .episode-list::-webkit-scrollbar-thumb:hover {
+    background: #555;
   }
 
   .episode-btn {
@@ -660,8 +690,26 @@
   /* iOS 9 特定优化 */
   @supports (-webkit-overflow-scrolling: touch) {
     .sidebar-content,
-    .main-content {
+    .main-content,
+    .episode-list {
       -webkit-overflow-scrolling: touch;
+    }
+  }
+  
+  /* 小屏幕设备优化 */
+  @media (max-width: 768px) {
+    .episode-list {
+      max-height: 150px; /* 移动设备上更小的高度 */
+      padding: 12px;
+    }
+    
+    .main-content {
+      padding: 16px;
+    }
+    
+    .combined-title {
+      font-size: 18px;
+      margin: 8px 0 16px;
     }
   }
 
