@@ -1098,8 +1098,9 @@
         
         if (startTime !== null && startTime !== undefined && startTime > 0) {
           pendingSeekTime = startTime;
-          // 如果有指定开始时间，等待元数据加载后处理
-          player.one('loadedmetadata', function() {
+          
+          // iOS 9 特殊处理：需要等待更多事件确保视频准备就绪
+          var handleTimeSeek = function() {
             if (isIOS) {
               // iOS需要用户交互才能跳转，显示恢复提示
               var timeStr = formatTime(startTime);
@@ -1109,33 +1110,98 @@
               // 设置点击事件处理
               restoreOverlay.onclick = function() {
                 restoreOverlay.style.display = 'none';
-                // 先播放，然后在合适的时机跳转
-                player.play();
-                // 使用setTimeout确保播放已开始
-                setTimeout(function() {
-                  console.log('iOS恢复播放：跳转到 ' + pendingSeekTime + '秒');
+                
+                // iOS 9 优化：先尝试设置时间，再播放
+                try {
                   player.currentTime(pendingSeekTime);
-                  pendingSeekTime = null;
-                }, 100);
+                } catch (e) {
+                  console.log('预设时间失败，播放后再跳转:', e);
+                }
+                
+                // 播放视频
+                var playPromise = player.play();
+                
+                // iOS 9 兼容：检查是否返回Promise
+                if (playPromise && typeof playPromise.then === 'function') {
+                  playPromise.then(function() {
+                    // 播放成功后再次尝试跳转
+                    setTimeout(function() {
+                      console.log('iOS恢复播放：跳转到 ' + pendingSeekTime + '秒');
+                      player.currentTime(pendingSeekTime);
+                      pendingSeekTime = null;
+                    }, 200); // iOS 9 需要更长的延迟
+                  }).catch(function(e) {
+                    console.error('播放失败:', e);
+                  });
+                } else {
+                  // 旧版本浏览器不返回Promise
+                  setTimeout(function() {
+                    console.log('iOS恢复播放：跳转到 ' + pendingSeekTime + '秒');
+                    player.currentTime(pendingSeekTime);
+                    pendingSeekTime = null;
+                  }, 300); // iOS 9 需要更长的延迟
+                }
               };
             } else {
               // 非iOS设备直接跳转
               player.currentTime(startTime);
-              player.play();
+              var playPromise = player.play();
+              if (playPromise && typeof playPromise.then === 'function') {
+                playPromise.catch(function(e) {
+                  console.error('播放失败:', e);
+                });
+              }
             }
-          });
+          };
+          
+          // iOS 9 兼容：监听多个事件确保视频准备就绪
+          if (isIOS) {
+            var metadataLoaded = false;
+            var canPlayLoaded = false;
+            
+            var checkReady = function() {
+              if (metadataLoaded && canPlayLoaded) {
+                handleTimeSeek();
+              }
+            };
+            
+            player.one('loadedmetadata', function() {
+              console.log('iOS 9: loadedmetadata 事件触发');
+              metadataLoaded = true;
+              checkReady();
+            });
+            
+            player.one('canplay', function() {
+              console.log('iOS 9: canplay 事件触发');
+              canPlayLoaded = true;
+              checkReady();
+            });
+            
+            // 备用方案：如果事件没有触发，使用定时器
+            setTimeout(function() {
+              if (!metadataLoaded || !canPlayLoaded) {
+                console.log('iOS 9: 使用备用方案处理时间跳转');
+                handleTimeSeek();
+              }
+            }, 1000);
+          } else {
+            player.one('loadedmetadata', handleTimeSeek);
+          }
         } else {
           // 没有指定时间，直接播放
-          player.play().catch(function(e) {
-            console.error('自动播放失败:', e);
-            // 如果自动播放失败，显示提示
-            restoreOverlay.innerHTML = '点击屏幕开始播放';
-            restoreOverlay.style.display = 'flex';
-            restoreOverlay.onclick = function() {
-              restoreOverlay.style.display = 'none';
-              player.play();
-            };
-          });
+          var playPromise = player.play();
+          if (playPromise && typeof playPromise.then === 'function') {
+            playPromise.catch(function(e) {
+              console.error('自动播放失败:', e);
+              // 如果自动播放失败，显示提示
+              restoreOverlay.innerHTML = '点击屏幕开始播放';
+              restoreOverlay.style.display = 'flex';
+              restoreOverlay.onclick = function() {
+                restoreOverlay.style.display = 'none';
+                player.play();
+              };
+            });
+          }
         }
         
         updateActiveStates();
@@ -1561,26 +1627,30 @@
           renderSeriesList();
         }
         
+        // iOS检测
+        var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+        
         // 初始化Video.js播放器 - iOS 9优化配置
         var playerOptions = {
           html5: {
             hls: {
-              overrideNative: !videojs.browser.IS_IOS, // iOS使用原生HLS
+              overrideNative: false, // iOS 9 强制使用原生HLS
               withCredentials: false,
               enableLowInitialPlaylist: true,
-              smoothQualityChange: true,
-              fastQualityChange: true
+              smoothQualityChange: false, // iOS 9 禁用平滑切换
+              fastQualityChange: false // iOS 9 禁用快速切换
             },
-            nativeVideoTracks: false,
-            nativeAudioTracks: false,
-            nativeTextTracks: false
+            nativeVideoTracks: true, // iOS 9 使用原生轨道
+            nativeAudioTracks: true,
+            nativeTextTracks: true
           },
           techOrder: ['html5'],
           controls: true,
-          preload: 'auto',
+          preload: isIOS ? 'metadata' : 'auto', // iOS 9 优化：只预加载元数据
           fluid: true,
           responsive: true,
           errorDisplay: true,
+          playsinline: true, // iOS 9 内联播放
           sources: []
         };
         
@@ -1765,7 +1835,11 @@
         
         player.on('pause', saveProgress);
         player.on('timeupdate', function() {
-          if (Math.floor(player.currentTime()) % 10 === 0) {
+          // iOS 9 优化：减少保存频率，避免性能问题
+          var currentTime = player.currentTime();
+          if (isIOS && Math.floor(currentTime) % 15 === 0) {
+            saveProgress();
+          } else if (!isIOS && Math.floor(currentTime) % 10 === 0) {
             saveProgress();
           }
         });
