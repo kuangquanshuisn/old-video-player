@@ -1141,43 +1141,29 @@
               restoreOverlay.style.display = 'flex';
               // 设置点击事件处理
               restoreOverlay.onclick = function() {
-                restoreOverlay.style.display = 'none';
-                
-                // iOS 9 优化：先尝试设置时间，再播放
-                try {
-                  player.currentTime(pendingSeekTime);
-                } catch (e) {
-                  console.log('预设时间失败，播放后再跳转:', e);
-                }
-                
-                // 播放视频
-                var playPromise = player.play();
-                
-                // iOS 9 兼容：检查是否返回Promise
-                if (playPromise && typeof playPromise.then === 'function') {
-                  playPromise.then(function() {
-                    // 播放成功后再次尝试跳转
+                if (pendingSeekTime !== null) {
+                  // 先播放，然后在合适的时机跳转
+                  var playPromise = player.play();
+                  if (playPromise && typeof playPromise.then === 'function') {
+                    playPromise.then(function() {
+                      // 使用setTimeout确保播放已开始
+                      setTimeout(function() {
+                        console.log('iOS恢复播放：跳转到 ' + pendingSeekTime + '秒');
+                        player.currentTime(pendingSeekTime);
+                        pendingSeekTime = null;
+                      }, 100);
+                    }).catch(function(e) {
+                      console.error('播放失败:', e);
+                    });
+                  } else {
                     setTimeout(function() {
                       console.log('iOS恢复播放：跳转到 ' + pendingSeekTime + '秒');
                       player.currentTime(pendingSeekTime);
                       pendingSeekTime = null;
-                      // 确保覆盖层被隐藏
-                      restoreOverlay.style.display = 'none';
-                    }, 200); // iOS 9 需要更长的延迟
-                  }).catch(function(e) {
-                    console.error('播放失败:', e);
-                    // 播放失败时也要隐藏覆盖层
-                    restoreOverlay.style.display = 'none';
-                  });
+                    }, 100);
+                  }
                 } else {
-                  // 旧版本浏览器不返回Promise
-                  setTimeout(function() {
-                    console.log('iOS恢复播放：跳转到 ' + pendingSeekTime + '秒');
-                    player.currentTime(pendingSeekTime);
-                    pendingSeekTime = null;
-                    // 确保覆盖层被隐藏
-                    restoreOverlay.style.display = 'none';
-                  }, 300); // iOS 9 需要更长的延迟
+                  player.play();
                 }
               };
 
@@ -1236,7 +1222,6 @@
               restoreOverlay.innerHTML = '点击屏幕开始播放';
               restoreOverlay.style.display = 'flex';
               restoreOverlay.onclick = function() {
-                restoreOverlay.style.display = 'none';
                 player.play();
               };
             });
@@ -1912,10 +1897,20 @@
           }
         });
 
-        // 播放开始时隐藏覆盖层
+        // 播放开始时隐藏覆盖层 - 确保覆盖层被隐藏
         player.on('play', function() {
           var restoreOverlay = document.getElementById('restore-overlay');
-          restoreOverlay.style.display = 'none';
+          if (restoreOverlay) {
+            restoreOverlay.style.display = 'none';
+          }
+        });
+        
+        // 添加额外的事件监听确保覆盖层被隐藏
+        player.on('playing', function() {
+          var restoreOverlay = document.getElementById('restore-overlay');
+          if (restoreOverlay) {
+            restoreOverlay.style.display = 'none';
+          }
         });
         
         // 页面状态变化时保存进度
