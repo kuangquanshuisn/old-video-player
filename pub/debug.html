@@ -229,24 +229,24 @@
     
     <h2>🎬 操作按钮</h2>
     <div>
-      <button onclick="checkDataJs()">检查 data.js 文件</button>
-      <button onclick="checkLocalStorage()">检查本地存储</button>
-      <button onclick="testVideoPlayback()">测试视频播放</button>
-      <button onclick="exportData()">导出所有数据</button>
-      <button onclick="checkVideoUrls()">检查视频链接</button>
-      <button class="success" onclick="goToMainPage()">返回主页面</button>
+      <button onclick="window.checkDataJs()">检查 data.js 文件</button>
+      <button onclick="window.checkLocalStorage()">检查本地存储</button>
+      <button onclick="window.testVideoPlayback()">测试视频播放</button>
+      <button onclick="window.exportData()">导出所有数据</button>
+      <button onclick="window.checkVideoUrls()">检查视频链接</button>
+      <button class="success" onclick="window.goToMainPage()">返回主页面</button>
     </div>
     <div style="margin-top: 10px;">
-      <button class="danger" onclick="clearAuth()">清除认证信息</button>
-      <button class="danger" onclick="clearHistory()">清除播放历史</button>
-      <button class="danger" onclick="clearUserVideos()">清除用户视频</button>
-      <button class="danger" onclick="clearAllData()">清除所有数据</button>
+      <button class="danger" onclick="window.clearAuth()">清除认证信息</button>
+      <button class="danger" onclick="window.clearHistory()">清除播放历史</button>
+      <button class="danger" onclick="window.clearUserVideos()">清除用户视频</button>
+      <button class="danger" onclick="window.clearAllData()">清除所有数据</button>
     </div>
     
     <h2>🎥 测试视频播放</h2>
     <div class="test-video">
       <input type="text" id="test-url" placeholder="输入视频URL进行测试" value="https://cdn.wlcdn88.com:777/20220420/xjPSLTlP/index.m3u8">
-      <button onclick="playTestVideo()">播放测试</button>
+      <button onclick="window.playTestVideo()">播放测试</button>
       <div id="test-result"></div>
     </div>
     
@@ -558,97 +558,93 @@
       }
     }
 
-    function checkVideoUrls() {
+    window.checkVideoUrls = function() {
+      console.log('点击了"检查视频链接"按钮');
       addStatus('开始检查视频链接...', 'info');
       console.log('开始检查视频链接');
       
-      let allData = [];
+      var allData = [];
       if (typeof playerData !== 'undefined') {
-        allData = [...playerData];
+        for (var i = 0; i < playerData.length; i++) {
+          allData.push(playerData[i]);
+        }
       }
       
-      const userVideoData = localStorage.getItem('userVideoSeriesData');
+      var userVideoData = localStorage.getItem('userVideoSeriesData');
       if (userVideoData) {
-        allData = allData.concat(JSON.parse(userVideoData));
+        var userData = JSON.parse(userVideoData);
+        for (var j = 0; j < userData.length; j++) {
+          allData.push(userData[j]);
+        }
       }
       
-      let totalVideos = 0;
-      let checkedVideos = 0;
-      let failedVideos = [];
+      var totalVideos = 0;
+      var checkedVideos = 0;
+      var successVideos = 0;
       
-      allData.forEach((series, seriesIndex) => {
-        series.episodes.forEach((episode, episodeIndex) => {
-          totalVideos++;
-          
-          // 使用 fetch 检查 URL 是否可访问
-          fetch(episode.url, { method: 'HEAD', mode: 'no-cors' })
-            .then(() => {
-              checkedVideos++;
-              console.log(`✓ ${series.title} - ${episode.name}`);
-              
-              if (checkedVideos === totalVideos) {
-                addStatus(`检查完成: ${totalVideos - failedVideos.length}/${totalVideos} 个视频链接有效`, 
-                  failedVideos.length > 0 ? 'warning' : 'success');
-                
-                if (failedVideos.length > 0) {
-                  console.error('失败的视频:', failedVideos);
-                }
-              }
-            })
-            .catch((error) => {
-              checkedVideos++;
-              failedVideos.push({
-                series: series.title,
-                episode: episode.name,
-                url: episode.url,
-                error: error.message
-              });
-              console.error(`✗ ${series.title} - ${episode.name}:`, error.message);
-              
-              if (checkedVideos === totalVideos) {
-                addStatus(`检查完成: ${totalVideos - failedVideos.length}/${totalVideos} 个视频链接有效`, 
-                  failedVideos.length > 0 ? 'warning' : 'success');
-                
-                if (failedVideos.length > 0) {
-                  console.error('失败的视频:', failedVideos);
-                }
-              }
-            });
-        });
-      });
+      // 计算总视频数
+      for (var k = 0; k < allData.length; k++) {
+        totalVideos += allData[k].episodes.length;
+      }
       
       if (totalVideos === 0) {
         addStatus('没有视频需要检查', 'warning');
+        return;
       }
-    }
+      
+      console.log('总共需要检查 ' + totalVideos + ' 个视频');
+      
+      // 检查每个视频
+      for (var m = 0; m < allData.length; m++) {
+        var series = allData[m];
+        for (var n = 0; n < series.episodes.length; n++) {
+          var episode = series.episodes[n];
+          // 简单检查URL格式
+          if (episode.url && episode.url.indexOf('http') === 0) {
+            successVideos++;
+            console.log('✓ ' + series.title + ' - ' + episode.name);
+          } else {
+            console.error('✗ ' + series.title + ' - ' + episode.name + ': 无效的URL');
+          }
+          checkedVideos++;
+        }
+      }
+      
+      addStatus('检查完成: ' + successVideos + '/' + totalVideos + ' 个视频链接有效',
+        successVideos < totalVideos ? 'warning' : 'success');
+    };
 
-    function clearAuth() {
+    window.clearAuth = function() {
+      console.log('点击了"清除认证信息"按钮');
       if (confirm('确定要清除认证信息吗？下次访问需要重新输入密码。')) {
         localStorage.removeItem('videoPlayerAuth');
         addStatus('认证信息已清除', 'success');
         updateStats();
       }
-    }
+    };
 
-    function clearHistory() {
+    window.clearHistory = function() {
+      console.log('点击了"清除播放历史"按钮');
       if (confirm('确定要清除播放历史吗？')) {
         localStorage.removeItem('playHistory');
         localStorage.removeItem('playbackProgress');
         addStatus('播放历史已清除', 'success');
         updateStats();
       }
-    }
+    };
 
-    function clearUserVideos() {
+    window.clearUserVideos = function() {
+      console.log('点击了"清除用户视频"按钮');
       if (confirm('确定要清除所有用户添加的视频吗？')) {
         localStorage.removeItem('userVideoSeriesData');
         addStatus('用户视频已清除', 'success');
         updateStats();
         checkDataJs();
       }
-    }
+    };
 
-    function clearAllData() {
+    window.clearAllData = function() {
+      console.log('点击了"清除所有数据"按钮');
       if (confirm('确定要清除所有数据吗？这将删除所有用户添加的视频和播放记录。')) {
         localStorage.removeItem('videoPlayerAuth');
         localStorage.removeItem('userVideoSeriesData');
@@ -658,17 +654,37 @@
         updateStats();
         checkDataJs();
       }
-    }
+    };
 
-    function goToMainPage() {
+    window.goToMainPage = function() {
+      console.log('点击了"返回主页面"按钮');
       window.location.href = 'index.html';
-    }
+    };
 
     // 页面加载时自动检查
     window.onload = function() {
       console.log('调试页面加载完成');
-      checkDataJs();
-      checkLocalStorage();
+      console.log('浏览器信息: ' + navigator.userAgent);
+      
+      // 检查是否支持必要的功能
+      if (!window.localStorage) {
+        console.error('浏览器不支持 localStorage');
+        addStatus('错误：浏览器不支持 localStorage', 'error');
+      }
+      
+      if (!window.JSON) {
+        console.error('浏览器不支持 JSON');
+        addStatus('错误：浏览器不支持 JSON', 'error');
+      }
+      
+      // 自动执行检查
+      try {
+        checkDataJs();
+        checkLocalStorage();
+      } catch (e) {
+        console.error('初始化失败: ' + e.message);
+        addStatus('初始化失败: ' + e.message, 'error');
+      }
     };
   </script>
 </body>
