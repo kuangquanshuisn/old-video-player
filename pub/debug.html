@@ -229,18 +229,25 @@
     
     <h2>🎬 操作按钮</h2>
     <div>
-      <button onclick="window.checkDataJs()">检查 data.js 文件</button>
-      <button onclick="window.checkLocalStorage()">检查本地存储</button>
-      <button onclick="window.testVideoPlayback()">测试视频播放</button>
-      <button onclick="window.exportData()">导出所有数据</button>
-      <button onclick="window.checkVideoUrls()">检查视频链接</button>
-      <button class="success" onclick="window.goToMainPage()">返回主页面</button>
+      <button onclick="checkDataJs()">检查 data.js 文件</button>
+      <button onclick="checkLocalStorage()">检查本地存储</button>
+      <button onclick="testVideoPlayback()">测试视频播放</button>
+      <button onclick="exportData()">导出所有数据</button>
+      <button onclick="checkVideoUrls()">检查视频链接</button>
+      <button class="success" onclick="goToMainPage()">返回主页面</button>
     </div>
     <div style="margin-top: 10px;">
-      <button class="danger" onclick="window.clearAuth()">清除认证信息</button>
-      <button class="danger" onclick="window.clearHistory()">清除播放历史</button>
-      <button class="danger" onclick="window.clearUserVideos()">清除用户视频</button>
-      <button class="danger" onclick="window.clearAllData()">清除所有数据</button>
+      <button class="danger" onclick="clearAuth()">清除认证信息</button>
+      <button class="danger" onclick="clearHistory()">清除播放历史</button>
+      <button class="danger" onclick="clearUserVideos()">清除用户视频</button>
+      <button class="danger" onclick="clearAllData()">清除所有数据</button>
+    </div>
+    
+    <h2>🧪 测试页面</h2>
+    <div>
+      <button onclick="window.open('verify-fix.html', '_blank')">视频播放修复验证</button>
+      <button onclick="window.open('test-video-fix.html', '_blank')">独立视频测试</button>
+      <button onclick="window.open('test-playback.html', '_blank')">播放功能测试</button>
     </div>
     
     <h2>🎥 测试视频播放</h2>
@@ -344,7 +351,8 @@
       }
     }
 
-    function checkDataJs() {
+    // 将所有函数定义在全局作用域
+    window.checkDataJs = function() {
       const debugInfo = document.getElementById('debug-info');
       const videoData = document.getElementById('video-data');
       
@@ -414,9 +422,9 @@
         console.error('检查 data.js 失败:', e);
         debugInfo.textContent = e.stack;
       }
-    }
+    };
 
-    function checkLocalStorage() {
+    window.checkLocalStorage = function() {
       const debugInfo = document.getElementById('debug-info');
       
       try {
@@ -465,9 +473,9 @@
         console.error('检查本地存储失败:', e);
         debugInfo.textContent = e.stack;
       }
-    }
+    };
 
-    function testVideoPlayback() {
+    window.testVideoPlayback = function() {
       addStatus('开始测试视频播放功能...', 'info');
       console.log('测试视频播放功能');
       
@@ -499,9 +507,9 @@
       } else {
         addStatus('没有可用的视频进行测试', 'warning');
       }
-    }
+    };
 
-    function playTestVideo() {
+    window.playTestVideo = function() {
       const url = document.getElementById('test-url').value;
       if (!url) {
         addStatus('请输入视频URL', 'warning');
@@ -530,9 +538,9 @@
       video.play().catch(function(e) {
         console.error('播放失败:', e);
       });
-    }
+    };
 
-    function exportData() {
+    window.exportData = function() {
       try {
         const exportData = {
           playerData: typeof playerData !== 'undefined' ? playerData : [],
@@ -556,7 +564,7 @@
         addStatus(`导出失败: ${e.message}`, 'error');
         console.error('导出失败:', e);
       }
-    }
+    };
 
     window.checkVideoUrls = function() {
       console.log('点击了"检查视频链接"按钮');
@@ -679,8 +687,8 @@
       
       // 自动执行检查
       try {
-        checkDataJs();
-        checkLocalStorage();
+        window.checkDataJs();
+        window.checkLocalStorage();
       } catch (e) {
         console.error('初始化失败: ' + e.message);
         addStatus('初始化失败: ' + e.message, 'error');
