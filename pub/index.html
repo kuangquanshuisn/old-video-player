@@ -1180,11 +1180,10 @@
           
           // 等待视频准备就绪
           var metadataLoaded = false;
-          var canPlayLoaded = false;
           var timeoutId = null;
           
           var checkAndHandle = function() {
-            if (metadataLoaded && canPlayLoaded && pendingSeekTime !== null) {
+            if (metadataLoaded && pendingSeekTime !== null) {
               if (timeoutId) {
                 clearTimeout(timeoutId);
                 timeoutId = null;
@@ -1200,23 +1199,16 @@
             checkAndHandle();
           };
           
-          var canPlayHandler = function() {
-            console.log('canplay事件触发');
-            canPlayLoaded = true;
-            checkAndHandle();
-          };
-          
           // 使用one确保事件只触发一次
           player.one('loadedmetadata', metadataHandler);
-          player.one('canplay', canPlayHandler);
           
-          // 备用方案：如果2秒内事件未触发，强制处理
+          // 备用方案：如果800毫秒内事件未触发，强制处理
           timeoutId = setTimeout(function() {
             if (pendingSeekTime !== null) {
               console.log('使用备用方案处理时间跳转');
               handleTimeSeek();
             }
-          }, 2000);
+          }, 800);
           
         } else {
           // 没有指定时间，直接播放
