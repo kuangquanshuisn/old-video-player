@@ -313,38 +313,14 @@
     -webkit-flex-wrap: wrap;
     flex-wrap: wrap;
     gap: 8px;
-    padding: 20px;
+    padding: 20px 0;
     -webkit-justify-content: flex-start;
     justify-content: flex-start;
     max-width: 1000px;
     width: 100%;
     margin: 0 auto 20px;
-    max-height: 200px; /* 限制最大高度 */
-    overflow-y: auto; /* 添加垂直滚动 */
-    -webkit-overflow-scrolling: touch; /* iOS 9 平滑滚动 */
-    background: #f8f9fa;
-    border-radius: 8px;
-    border: 1px solid #e5e7eb;
   }
   
-  /* 剧集列表滚动条样式 */
-  .episode-list::-webkit-scrollbar {
-    width: 6px;
-  }
-  
-  .episode-list::-webkit-scrollbar-track {
-    background: #f1f1f1;
-    border-radius: 3px;
-  }
-  
-  .episode-list::-webkit-scrollbar-thumb {
-    background: #888;
-    border-radius: 3px;
-  }
-  
-  .episode-list::-webkit-scrollbar-thumb:hover {
-    background: #555;
-  }
 
   .episode-btn {
     padding: 8px 16px;
@@ -699,8 +675,7 @@
   /* 小屏幕设备优化 */
   @media (max-width: 768px) {
     .episode-list {
-      max-height: 150px; /* 移动设备上更小的高度 */
-      padding: 12px;
+      padding: 12px 0;
     }
     
     .main-content {
